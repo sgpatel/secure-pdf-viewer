@@ -1,14 +1,11 @@
+// src/App.js
 import React, { useState } from 'react';
-import PDFViewer from './components/PDFViewer';
+import PDFViewer from './components/PDFViewer.js_text';
+import './App.css';
 
 const App = () => {
-
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const pdfData = '';
-  // password = '67891982';
-
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
@@ -17,13 +14,13 @@ const App = () => {
     setIsAuthenticated(true);
   };
 
-//   const handlePrint = () => {
-//     const printerName = prompt("Enter printer name:");
-//     if (printerName) {
-//       // In a real application, you would send a request to your server here
-//       alert(`Print request sent for printer: ${printerName}`);
-//     }
-//   };
+  const handlePrint = () => {
+    const printerName = prompt("Enter printer name:");
+    if (printerName) {
+      // In a real application, you would send a request to your server here
+      alert(`Print request sent for printer: ${printerName}`);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -42,12 +39,11 @@ const App = () => {
     );
   }
 
-
   return (
     <div className="App">
       <h1>Secure PDF Viewer</h1>
-      <PDFViewer pdfData={pdfData} password={password} />
-      {/* <button onClick={handlePrint}>Print Document</button> */}
+      <PDFViewer />
+      <button onClick={handlePrint}>Print Document</button>
     </div>
   );
 };
