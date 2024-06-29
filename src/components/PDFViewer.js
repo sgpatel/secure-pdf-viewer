@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/build/pdf.worker.entry';
+import axios from 'axios';
 
 // Set the PDF.js worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+const PORT = 3001; // Port where your server is running
 
 const PDFViewer = ({ pdfData, password }) => {
   const canvasRef = useRef(null);
@@ -12,7 +15,7 @@ const PDFViewer = ({ pdfData, password }) => {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [pdfDocument, setPdfDocument] = useState(null);
   const [noOfPages, setNoOfPages] = useState(0);
-  const [permissionDenied, setPermissionDenied] = useState(false); // State to track permission denial
+ // const [permissionDenied, setPermissionDenied] = useState(false); // State to track permission denial
 
   useEffect(() => {
     const loadPDF = async () => {
@@ -59,25 +62,39 @@ const PDFViewer = ({ pdfData, password }) => {
     loadPDF();
 
     // Enumerate devices to find printers
-    navigator.permissions.query({ name: 'midi', sysex: false }).then(permissionStatus => {
-      console.log('Permission status:', permissionStatus.state);
-      if (permissionStatus.state === 'granted') {
-        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-          navigator.mediaDevices.enumerateDevices()
-            .then(devices => {
-              // Filter for potential printer devices
-              const potentialPrinters = devices.filter(device =>
-                device.kind === 'printer' && !device.label.toLowerCase().includes('default')
-              );
-              setPrinters(potentialPrinters);
-            })
-            .catch(error => console.error('Error enumerating devices:', error));
+    // navigator.permissions.query({ name: 'midi', sysex: false }).then(permissionStatus => {
+    //   console.log('Permission status:', permissionStatus.state);
+    //   if (permissionStatus.state === 'granted') {
+    //     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+    //       navigator.mediaDevices.enumerateDevices()
+    //         .then(devices => {
+    //           // Filter for potential printer devices
+    //           const potentialPrinters = devices.filter(device =>
+    //             device.kind === 'printer' && !device.label.toLowerCase().includes('default')
+    //           );
+    //           setPrinters(potentialPrinters);
+    //         })
+    //         .catch(error => console.error('Error enumerating devices:', error));
+    //     }
+    //   } else {
+    //     console.log('Permission denied');
+    //     setPermissionDenied(true); // Set state to true when permission is denied
+    //   }
+    // });
+
+   
+      const fetchPrinters = async () => {
+        try {
+          const response = await axios.get(`http://localhost:${PORT}/api/printers`);
+          const printers = response.data;
+          setPrinters(printers);
+        } catch (error) {
+          console.error('Error fetching printers:', error);
+          // Handle error state or retry logic if needed
         }
-      } else {
-        console.log('Permission denied');
-        setPermissionDenied(true); // Set state to true when permission is denied
-      }
-    });
+      };
+        fetchPrinters();
+   // Empty dependency array ensures this effect runs only once
   }, [pdfData, password]);
 
   const handlePrint = () => {
@@ -135,15 +152,12 @@ const PDFViewer = ({ pdfData, password }) => {
         <div className="print-dialog">
           <div className="dialog-content">
             <h2>Select Printer</h2>
-            <select
-              value={selectedPrinter}
-              onChange={(e) => setSelectedPrinter(e.target.value)}
-            >
-              <option value="">Select a printer</option>
-              {printers.map((printer, index) => (
-                <option key={index} value={printer.label}>{printer.label}</option>
-              ))}
-            </select>
+            <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
+            <option value="">Select a printer</option>
+            {printers.map((printer, index) => (
+              <option key={index} value={printer}>{printer}</option>
+            ))}
+          </select>
             <div className="dialog-buttons">
               <button className="confirm-button" onClick={confirmPrint}>Print</button>
               <button className="cancel-button" onClick={() => setShowPrintDialog(false)}>Cancel</button>
@@ -153,11 +167,11 @@ const PDFViewer = ({ pdfData, password }) => {
       )}
 
       {/* Alert when permission is denied */}
-      {permissionDenied && (
+      {/* {permissionDenied && (
         <div className="permission-alert">
           <p>Permission to enumerate devices was denied. Printing functionality may be limited.</p>
         </div>
-      )}
+      )} */}
 
       <style jsx>{`
         .pdf-viewer {
