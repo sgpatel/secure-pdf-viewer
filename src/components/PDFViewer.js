@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/build/pdf.worker.entry';
 import axios from 'axios';
+import { PDFDocument } from 'pdf-lib'; // Import PDFDocument from pdf-lib for server-side PDF processing
+import { Buffer } from 'buffer';
 
-// Set the PDF.js worker source
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const PORT = 3001; // Port where your server is running
 
@@ -15,7 +15,6 @@ const PDFViewer = ({ pdfData, password }) => {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [pdfDocument, setPdfDocument] = useState(null);
   const [noOfPages, setNoOfPages] = useState(0);
- // const [permissionDenied, setPermissionDenied] = useState(false); // State to track permission denial
 
   useEffect(() => {
     const loadPDF = async () => {
@@ -61,40 +60,17 @@ const PDFViewer = ({ pdfData, password }) => {
 
     loadPDF();
 
-    // Enumerate devices to find printers
-    // navigator.permissions.query({ name: 'midi', sysex: false }).then(permissionStatus => {
-    //   console.log('Permission status:', permissionStatus.state);
-    //   if (permissionStatus.state === 'granted') {
-    //     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-    //       navigator.mediaDevices.enumerateDevices()
-    //         .then(devices => {
-    //           // Filter for potential printer devices
-    //           const potentialPrinters = devices.filter(device =>
-    //             device.kind === 'printer' && !device.label.toLowerCase().includes('default')
-    //           );
-    //           setPrinters(potentialPrinters);
-    //         })
-    //         .catch(error => console.error('Error enumerating devices:', error));
-    //     }
-    //   } else {
-    //     console.log('Permission denied');
-    //     setPermissionDenied(true); // Set state to true when permission is denied
-    //   }
-    // });
-
-   
-      const fetchPrinters = async () => {
-        try {
-          const response = await axios.get(`http://localhost:${PORT}/api/printers`);
-          const printers = response.data;
-          setPrinters(printers);
-        } catch (error) {
-          console.error('Error fetching printers:', error);
-          // Handle error state or retry logic if needed
-        }
-      };
-        fetchPrinters();
-   // Empty dependency array ensures this effect runs only once
+    const fetchPrinters = async () => {
+      try {
+        const response = await axios.get(`http://localhost:${PORT}/api/printers`);
+        const printers = response.data;
+        setPrinters(printers);
+      } catch (error) {
+        console.error('Error fetching printers:', error);
+      }
+    };
+    
+    fetchPrinters();
   }, [pdfData, password]);
 
   const handlePrint = () => {
@@ -105,24 +81,33 @@ const PDFViewer = ({ pdfData, password }) => {
     if (selectedPrinter) {
       if (!isVirtualPrinter(selectedPrinter)) {
         try {
-          const pdfBytes = await pdfDocument.getData();
-          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          const blobUrl = URL.createObjectURL(blob);
-
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          iframe.src = blobUrl;
-
-          document.body.appendChild(iframe);
-          iframe.contentWindow.print();
-
-          // Clean up
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-          }, 1000);
+          // Check if pdfDocument is loaded and not null
+          if (pdfDocument) {
+            // Get PDF bytes
+            const pdfBytes = await pdfDocument.getData();
+            const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
+    
+            console.log('Printing PDF to printer:', selectedPrinter);
+            console.log('PDF Data:', pdfBase64);
+    
+            const response = await axios.post(`http://localhost:${PORT}/api/print`, {
+              printerName: selectedPrinter,
+              pdfData: pdfBase64,
+              password: password || '', 
+            });
+    
+            console.log('Server response:', response.data);
+            alert('Printing initiated successfully.');
+          } else {
+            alert('PDF document is not loaded.');
+          }
         } catch (error) {
           console.error('Error printing:', error);
+          if (error.response) {
+            console.error('Response data:', error.response.data);
+            console.error('Response status:', error.response.status);
+            console.error('Response headers:', error.response.headers);
+          }
           alert('An error occurred while printing. Please try again.');
         }
       } else {
@@ -133,7 +118,7 @@ const PDFViewer = ({ pdfData, password }) => {
     }
     setShowPrintDialog(false);
   };
-
+  
   const isVirtualPrinter = (printerName) => {
     const virtualPrinterKeywords = ['pdf', 'xps', 'onenote', 'onedrive', 'cloud', 'fax', 'microsoft print to pdf'];
     return virtualPrinterKeywords.some(keyword =>
@@ -153,11 +138,11 @@ const PDFViewer = ({ pdfData, password }) => {
           <div className="dialog-content">
             <h2>Select Printer</h2>
             <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
-            <option value="">Select a printer</option>
-            {printers.map((printer, index) => (
-              <option key={index} value={printer}>{printer}</option>
-            ))}
-          </select>
+              <option value="">Select a printer</option>
+              {printers.map((printer, index) => (
+                <option key={index} value={printer}>{printer}</option>
+              ))}
+            </select>
             <div className="dialog-buttons">
               <button className="confirm-button" onClick={confirmPrint}>Print</button>
               <button className="cancel-button" onClick={() => setShowPrintDialog(false)}>Cancel</button>
@@ -165,13 +150,6 @@ const PDFViewer = ({ pdfData, password }) => {
           </div>
         </div>
       )}
-
-      {/* Alert when permission is denied */}
-      {/* {permissionDenied && (
-        <div className="permission-alert">
-          <p>Permission to enumerate devices was denied. Printing functionality may be limited.</p>
-        </div>
-      )} */}
 
       <style jsx>{`
         .pdf-viewer {
@@ -236,14 +214,6 @@ const PDFViewer = ({ pdfData, password }) => {
         }
         .cancel-button:hover {
           background-color: #c82333;
-        }
-        .permission-alert {
-          background-color: #ffc107;
-          color: #856404;
-          border: 1px solid #ffeeba;
-          padding: 10px;
-          margin: 10px;
-          border-radius: 5px;
         }
       `}</style>
     </div>
